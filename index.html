@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MazenOS — Autonomous Single-Operator Command Deck</title>
+  <link rel="stylesheet" href="dashboard.css" />
+</head>
+<body>
+
+  <!-- Organ 4: Unskippable Biological Maintenance Banner (2.5 - 3h continuous focus) -->
+  <div id="bioMaintenanceBanner" class="bio-banner hidden" role="alert">
+    <div>
+      <strong>BIOLOGICAL MAINTENANCE MANDATE (ORGAN 4):</strong>
+      <span id="bioBannerText">150+ minutes of continuous focus detected without a break. Hydrate and consume nutrition now.</span>
+    </div>
+    <button id="ackBioBreakBtn" type="button" class="btn btn-ghost">Log 15m Recovery Break &amp; Clear</button>
+  </div>
+
+  <!-- Top Command Header: Agent Switcher, Provider Waterfall & <120-Token Live Telemetry -->
+  <header class="command-header">
+    <div class="header-top-row">
+      <div class="brand-cluster">
+        <div id="brandLogoBadge" class="brand-logo">AR</div>
+        <div>
+          <div class="brand-title">MazenOS <span style="font-weight:400;color:var(--text-secondary);font-size:12px;">v2.5 Single-Operator Kernel</span></div>
+          <div id="activeAgentSubtitle" class="brand-subtitle">ARI: Tactical Execution, Proof Auditor &amp; Cascading Rescheduler</div>
+        </div>
+      </div>
+
+      <!-- Dual-Agent Brain Switcher (Ari vs. Jade) -->
+      <div class="agent-switcher" role="group" aria-label="Dual-Agent Brain Switcher">
+        <button id="switchAriBtn" type="button" class="agent-btn active-ari">
+          <span>ARI</span>
+          <span style="font-size:10px;opacity:0.85;">Tactical / Enforcer</span>
+        </button>
+        <button id="switchJadeBtn" type="button" class="agent-btn">
+          <span>JADE</span>
+          <span style="font-size:10px;opacity:0.85;">Support / Sounding Board</span>
+        </button>
+      </div>
+
+      <!-- Provider & Settings Controls -->
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <select id="providerSelect" class="select-field" style="width:auto;font-size:12px;" aria-label="Active AI Provider">
+          <option value="gemini:light">Gemini 2.5 Flash-Lite (Cascade)</option>
+          <option value="gemini:smart">Gemini 2.5 Flash (Smart Tier)</option>
+          <option value="claude:light">Claude 3.5 Haiku (Light Tier)</option>
+          <option value="claude:smart">Claude 3.5 Sonnet (Smart Tier)</option>
+        </select>
+        <button id="simulate429Btn" type="button" class="btn btn-danger" title="Test HTTP 429 Inter-Provider Failover Modal">
+          Test 429 Failover
+        </button>
+        <button id="toggleSnapshotBtn" type="button" class="btn btn-ghost">
+          &lt;120-Tok State JSON
+        </button>
+        <button id="openConfigModalBtn" type="button" class="btn btn-ghost">
+          Worker / Keys
+        </button>
+      </div>
+    </div>
+
+    <!-- Live <120 Token State Telemetry Pill Bar -->
+    <div id="telemetryBar" class="telemetry-bar">
+      <span class="telemetry-pill">AST: <strong id="telTimeNow">2026-10-20 23:00 AST</strong></span>
+      <span class="telemetry-pill">Active P1: <strong id="telActiveP1">Bio Ch4 (23:45)</strong></span>
+      <span class="telemetry-pill">Chain: <strong id="telDownstreamChain">t_102 &rarr; t_103</strong></span>
+      <span class="telemetry-pill">Health: <strong id="telHealth">6.0h | E:4/5 | Meds 1/2</strong></span>
+      <span class="telemetry-pill">Rest Window: <strong id="telRestWindow">00:00 - 00:45</strong></span>
+      <span class="telemetry-pill">Budget: <strong id="telBudget">88.33 SAR</strong></span>
+      <span id="telLockPill" class="telemetry-pill pill-unlocked">Phone: <strong id="telLockState">UNLOCKED</strong></span>
+    </div>
+
+    <!-- Collapsible Raw <120-Token JSON Snapshot Inspector -->
+    <pre id="stateJsonInspector" class="rollback-drawer hidden" style="font-family:var(--font-mono);font-size:11.5px;color:#93c5fd;margin-top:8px;border-radius:8px;"></pre>
+  </header>
+
+  <!-- Main Dual-Viewport Container -->
+  <main class="command-deck-container">
+
+    <!-- TOP VIEWPORT: Dual-Agent Conversational Terminal + Deep Work Pomodoro Deck -->
+    <section class="top-viewport-grid" aria-label="Dual-Agent Terminal and Deep Work Deck">
+
+      <!-- Left: Conversational Terminal (Ari / Jade) with 6-Message Sliding Window & Rollback Drawer -->
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span id="chatHeaderDot" style="width:9px;height:9px;border-radius:50%;background:var(--ari-accent);display:inline-block;"></span>
+            <span id="chatHeaderTitle">Ari Command Terminal</span>
+            <span id="slidingWindowBadge" class="badge badge-p3">D1 Sliding Window: 6/6 Msgs</span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button id="toggleHistoryDrawerBtn" type="button" class="btn btn-ghost" style="padding:4px 9px;font-size:11.5px;">
+              History &amp; Rollback (<span id="totalStoredMsgsCount">0</span> in D1)
+            </button>
+            <button id="newChatSessionBtn" type="button" class="btn btn-ghost" style="padding:4px 9px;font-size:11.5px;">
+              + New Session
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat Message Stream -->
+        <div id="chatMessagesViewport" class="chat-messages-viewport"></div>
+
+        <!-- Quick Tactical Directives Bar -->
+        <div style="padding:6px 12px;background:rgba(15,23,42,0.8);border-top:1px solid var(--border-subtle);display:flex;gap:6px;overflow-x:auto;">
+          <button type="button" class="btn btn-ghost quick-prompt-btn" data-prompt="Audit my current P1 chain and tell me what is blocking device unlock." style="padding:3px 8px;font-size:11px;">Status Brief</button>
+          <button type="button" class="btn btn-ghost quick-prompt-btn" data-prompt="I feel tired and want to push Bio Ch4 to tomorrow." style="padding:3px 8px;font-size:11px;">Test Comfort Excuse Guardrail</button>
+          <button type="button" class="btn btn-ghost quick-prompt-btn" data-prompt="I want to drive 25 minutes to a cafe right now before finishing Bio Ch4." style="padding:3px 8px;font-size:11px;">Test Commute Interception</button>
+          <button type="button" class="btn btn-ghost quick-prompt-btn" data-prompt="Help me decompress and calibrate my mindset based on my recent journal." style="padding:3px 8px;font-size:11px;">Jade Reality Check</button>
+        </div>
+
+        <!-- Chat Input Form -->
+        <form id="chatForm" class="chat-input-row">
+          <input id="chatInput" type="text" class="input-field" placeholder="Transmit directive to Ari (or toggle Jade for decompression)..." autocomplete="off" />
+          <button id="sendChatBtn" type="submit" class="btn btn-ari">Dispatch</button>
+        </form>
+
+        <!-- Collapsible D1 History, Search & Session Rollback Drawer -->
+        <div id="historyRollbackDrawer" class="rollback-drawer hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+            <strong style="font-size:12px;">D1 Persistent Chat Ledger &amp; Checkpoint Rollback</strong>
+            <div style="display:flex;gap:6px;">
+              <input id="historySearchInput" type="text" class="input-field" placeholder="Search D1 chat history..." style="width:180px;padding:4px 8px;font-size:11.5px;" />
+              <button id="historySearchBtn" type="button" class="btn btn-ghost" style="padding:4px 8px;font-size:11.5px;">Search</button>
+            </div>
+          </div>
+          <p style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;">
+            Every turn is stored permanently in D1 SQLite (`chat_messages`). Only the latest 6 turns are sent to the LLM. Click <strong>Roll Back Here</strong> on any turn to restore the session to that exact state with zero token cost.
+          </p>
+          <div id="rollbackTimelineList" style="display:flex;flex-direction:column;gap:6px;"></div>
+        </div>
+      </div>
+
+      <!-- Right: Organ 9 Deep Work Deck & Pomodoro / Biological Maintenance Engine -->
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-title">Organ 9: Deep Work &amp; Bio-Timer</div>
+          <span id="continuousFocusBadge" class="badge badge-p2">Focus Streak: 0m / 150m</span>
+        </div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:10px;flex:1;justify-content:space-between;">
+          <div>
+            <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;">Locked Milestone Target</div>
+            <div id="deckActiveTaskTitle" style="font-weight:700;font-size:14px;margin-top:2px;">Bio Ch4: Cellular Respiration</div>
+            <div id="deckActiveAuditRubric" style="font-size:11.5px;color:var(--text-secondary);margin-top:3px;">
+              Rubric: Handwritten ATP yield diagram + 10 practice questions graded.
+            </div>
+          </div>
+
+          <div id="pomodoroTimerDisplay" class="timer-display">25:00</div>
+
+          <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
+            <button id="startPomodoroBtn" type="button" class="btn btn-primary" style="flex:1;">Start / Pause</button>
+            <button id="resetPomodoroBtn" type="button" class="btn btn-ghost">Reset</button>
+            <select id="pomodoroModeSelect" class="select-field" style="width:auto;font-size:12px;" aria-label="Focus Session Type">
+              <option value="pomodoro:25">Pomodoro (25m)</option>
+              <option value="deep_work:50">Deep Work (50m)</option>
+              <option value="break:15">Bio Break (15m)</option>
+            </select>
+          </div>
+
+          <div style="border-top:1px solid var(--border-subtle);padding-top:10px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;gap:6px;">
+              <button id="logFastFocusBtn" type="button" class="btn btn-ghost" style="flex:1;font-size:11.5px;" title="Simulate logging a 50-minute Deep Work block to test Organ 4 Bio-Maintenance threshold">
+                +50m Deep Work Log
+              </button>
+              <button id="quickVaultJumpBtn" type="button" class="btn btn-ari" style="flex:1;font-size:11.5px;">
+                3-Min Idea Dump
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BOTTOM VIEWPORT: Responsive 8-Organ App Link Grid -->
+    <nav class="organ-nav-grid" aria-label="MazenOS Sub-Application Grid">
+      <button type="button" class="organ-tab-btn active" data-organ="taskitator">
+        <div class="organ-tab-title"><span>1. Taskitator</span><span id="navBadgeTasks" class="badge badge-p1">4</span></div>
+        <div class="organ-tab-desc">Eisenhower &bull; Vision Audit</div>
+      </button>
+      <button type="button" class="organ-tab-btn" data-organ="curry">
+        <div class="organ-tab-title"><span>2. Curry</span><span class="badge badge-p3">70/30</span></div>
+        <div class="organ-tab-desc">Curriculum &bull; Drills</div>
+      </button>
+      <button type="button" class="organ-tab-btn" data-organ="budget">
+        <div class="organ-tab-title"><span>3. Budget SMS</span><span id="navBadgeBudget" class="badge badge-p2">88 SAR</span></div>
+        <div class="organ-tab-desc">0-Token Regex Ledger</div>
+      </button>
+      <button type="button" class="organ-tab-btn" data-organ="ideas">
+        <div class="organ-tab-title"><span>4. Idea Vault</span><span id="navBadgeIdeas" class="badge badge-p4">LOCKED</span></div>
+        <div class="organ-tab-desc">3m Gate &bull; Fri Synth</div>
+      </button>
+      <button type="button" class="organ-tab-btn" data-organ="health">
+        <div class="organ-tab-title"><span>5. Circadian</span><span id="navBadgeHealth" class="badge badge-p3">6.0h</span></div>
+        <div class="organ-tab-desc">Sleep &bull; Sick Breaker</div>
+      </button>
+      <button type="button" class="organ-tab-btn" data-organ="locations">
+        <div class="organ-tab-title"><span>6. Locations</span><span class="badge badge-p4">3 Spots</span></div>
+        <div class="organ-tab-desc">Commute Gatekeeper</div>
+      </button>
+      <button type="button" class="organ-tab-btn" data-organ="diary">
+        <div class="organ-tab-title"><span>7. Diary</span><span id="navBadgeDiary" class="badge badge-p3">Jade</span></div>
+        <div class="organ-tab-desc">Longitudinal Mindset</div>
+      </button>
+      <button type="button" class="organ-tab-btn" data-organ="leisure">
+        <div class="organ-tab-title"><span>8. Hardware &amp; Debrief</span><span class="badge badge-bonus">Cron</span></div>
+        <div class="organ-tab-desc">/status &bull; NewPipe &bull; Retro</div>
+      </button>
+    </nav>
+
+    <!-- ====================================================================
+         ORGAN WORKSPACE 1: TASKITATOR CORE, CASCADING & MULTIMODAL PROOF AUDIT
+         ==================================================================== -->
+    <section id="organ-taskitator" class="organ-workspace-section active">
+      <div class="two-col-layout">
+
+        <!-- Left Column: Eisenhower Matrix Board & Cascading Controls -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Organ 1, 3 &amp; 5: Native Taskitator Queue &amp; Consecutive Cascade</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <select id="taskFilterSelect" class="select-field" style="width:auto;font-size:11.5px;" aria-label="Filter Tasks">
+                <option value="all">All Active (Velocity Sorted)</option>
+                <option value="1">P1: Urgent &amp; Important</option>
+                <option value="2">P2: Strategic / Consecutive</option>
+                <option value="3">P3: Operational</option>
+                <option value="4">P4: Backlog</option>
+                <option value="bonus">Elastic Bonus Queue</option>
+                <option value="completed">Completed &amp; Audited</option>
+              </select>
+              <button id="surfaceBonusBtn" type="button" class="btn btn-ghost" style="font-size:11.5px;border-color:var(--bonus-purple);color:#d8b4fe;">
+                Surface Bonus Tasks
+              </button>
+              <button id="revertBonusBtn" type="button" class="btn btn-ghost" style="font-size:11.5px;">
+                Revert Untouched Bonus
+              </button>
+            </div>
+          </div>
+          <div id="taskListContainer" style="padding:12px;display:flex;flex-direction:column;gap:10px;"></div>
+        </div>
+
+        <!-- Right Column: Add Task + Multimodal Computer Vision Proof Auditor -->
+        <div style="display:flex;flex-direction:column;gap:14px;">
+
+          <!-- Create Task Card -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title">Deploy New Task / Consecutive Chain Node</div>
+            </div>
+            <form id="createTaskForm" style="padding:12px;display:flex;flex-direction:column;gap:8px;">
+              <input id="newTaskTitle" type="text" class="input-field" placeholder="Task title (e.g., Bio Ch5 Practice Set)" required />
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+                <select id="newTaskPriority" class="select-field" aria-label="Task Priority">
+                  <option value="1">P1 (Urgent/Core)</option>
+                  <option value="2">P2 (Important)</option>
+                  <option value="3">P3 (Support)</option>
+                  <option value="4">P4 (Backlog)</option>
+                </select>
+                <input id="newTaskDue" type="text" class="input-field" placeholder="Due HH:MM (23:55)" value="23:55" />
+                <input id="newTaskDuration" type="number" class="input-field" placeholder="Mins (45)" value="45" min="5" max="300" />
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center;">
+                <select id="newTaskParent" class="select-field" aria-label="Parent Dependency Task">
+                  <option value="">Independent (No Parent)</option>
+                </select>
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer;">
+                  <input id="newTaskConsecutive" type="checkbox" checked />
+                  <span>Consecutive Cascade (`is_consecutive`)</span>
+                </label>
+              </div>
+              <input id="newTaskCriteria" type="text" class="input-field" placeholder="AI Vision Audit Rubric (e.g., Handwritten derivation + summary)" />
+              <input id="newTaskSubtasks" type="text" class="input-field" placeholder="Subtasks comma-separated (e.g., Read section, Solve 10 drills, Self-grade)" />
+              <button type="submit" class="btn btn-primary">Commit Task to D1</button>
+            </form>
+          </div>
+
+          <!-- Multimodal Computer Vision Proof Audit Card -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title">Organ 3: Zero-Simulation Multimodal Vision Audit</div>
+              <span class="badge badge-p1">Fail-Closed Policy</span>
+            </div>
+            <form id="proofAuditForm" style="padding:12px;display:flex;flex-direction:column;gap:8px;">
+              <select id="auditTaskSelect" class="select-field" aria-label="Select Task to Audit"></select>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <input id="auditFileInput" type="file" accept="image/*,application/pdf" class="input-field" style="flex:1;font-size:11.5px;" />
+                <button id="loadSampleProofBtn" type="button" class="btn btn-ghost" style="font-size:11.5px;">
+                  Load Sample Handwritten Proof
+                </button>
+              </div>
+              <textarea id="auditNotesInput" rows="2" class="textarea-field" placeholder="Submission verification notes (e.g., Completed 12 ATP synthesis problems + diagram)..."></textarea>
+              <div style="display:flex;gap:8px;">
+                <button type="submit" class="btn btn-ari" style="flex:1;">Run Vision Rubric Audit</button>
+              </div>
+              <div id="auditResultBox" style="font-size:12px;color:var(--text-secondary);font-family:var(--font-mono);padding-top:4px;"></div>
+            </form>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         ORGAN WORKSPACE 2: SMART CURRICULUM ASSISTANT ("CURRY")
+         ==================================================================== -->
+    <section id="organ-curry" class="organ-workspace-section">
+      <div class="two-col-layout">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Organ 7: Curry Curriculum Sequencer (70% Main / 30% Sub Split)</div>
+            <span id="curryAllocationBadge" class="badge badge-p3">Main: 70% | Sub: 30%</span>
+          </div>
+          <div style="padding:12px;display:flex;flex-direction:column;gap:12px;">
+            <!-- Pairing Recommendation Box -->
+            <div id="curryPairingBanner" style="background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:8px;padding:10px;font-size:12.5px;"></div>
+
+            <!-- Curriculum Units Table/List -->
+            <div id="curryUnitsContainer" style="display:flex;flex-direction:column;gap:8px;"></div>
+
+            <!-- Consensual Spaced Retrieval Drills -->
+            <div style="border-top:1px solid var(--border-subtle);padding-top:10px;">
+              <div style="font-weight:700;font-size:12.5px;margin-bottom:6px;">Consensual Spaced-Retrieval Drill Proposals</div>
+              <div id="curryDrillsContainer" style="display:flex;flex-direction:column;gap:6px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <!-- Standardized External Web LLM Syllabus Extractor -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title">Zero-Token External LLM Syllabus Intake</div>
+              <button id="copyCurryPromptBtn" type="button" class="btn btn-ghost" style="padding:4px 8px;font-size:11px;">Copy Extraction Prompt</button>
+            </div>
+            <div style="padding:12px;display:flex;flex-direction:column;gap:8px;">
+              <p style="font-size:11.5px;color:var(--text-secondary);">
+                Copy this standardized prompt into Gemini Pro / ChatGPT Plus alongside your syllabus PDF, then paste the returned JSON array below for zero Cloudflare token waste:
+              </p>
+              <textarea id="curryPromptPreview" rows="4" class="textarea-field" readonly style="font-family:var(--font-mono);font-size:11px;"></textarea>
+              <textarea id="curryJsonImportInput" rows="4" class="textarea-field" placeholder='Paste extracted JSON array here or click "Load Sample Syllabus JSON"...' style="font-family:var(--font-mono);font-size:11px;"></textarea>
+              <div style="display:flex;gap:8px;">
+                <button id="loadSampleSyllabusBtn" type="button" class="btn btn-ghost" style="flex:1;">Load Sample Syllabus JSON</button>
+                <button id="importSyllabusJsonBtn" type="button" class="btn btn-primary" style="flex:1;">Import Units to Curry</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         ORGAN WORKSPACE 3: ZERO-COST BANK SMS REGEX PARSER & BUDGET LEDGER
+         ==================================================================== -->
+    <section id="organ-budget" class="organ-workspace-section">
+      <div class="two-col-layout">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Organ 10: Zero-Cost Bank SMS Regex Parser (`/api/budget/sms`)</div>
+            <span class="badge badge-p3">0 API Tokens</span>
+          </div>
+          <div style="padding:12px;display:flex;flex-direction:column;gap:10px;">
+            <p style="font-size:12px;color:var(--text-secondary);">
+              MacroDroid intercepts incoming Saudi bank POS SMS notifications and posts the raw text string to `/api/budget/sms`. Pure worker regex extracts Card, SAR Amount, Merchant, Balance, and Timestamp at zero LLM token cost.
+            </p>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button type="button" class="btn btn-ghost sample-sms-btn" data-sms="Purchase via Mada Card: *4821; Amount: SAR 24.50; At: Camel Step Roasters; Balance: 63.83 SAR; Date: 2026-10-20 22:40" style="font-size:11px;">
+                Sample 1: English Mada POS
+              </button>
+              <button type="button" class="btn btn-ghost sample-sms-btn" data-sms="شراء عبر مدى بطاقة: 9910 بمبلغ: 38.00 ريال لدى: مكتبة جرير الرصيد: 25.83 ر.س في 2026-10-20 22:55" style="font-size:11px;">
+                Sample 2: Arabic Al-Rajhi / Jarir SMS
+              </button>
+            </div>
+            <textarea id="rawSmsInput" rows="3" class="textarea-field" placeholder="Paste raw bank POS SMS text here..."></textarea>
+            <button id="parseSmsWebhookBtn" type="button" class="btn btn-ari">Execute Regex Parse &amp; Commit to D1</button>
+            <div id="smsParseFeedback" style="font-family:var(--font-mono);font-size:11.5px;color:#6ee7b7;"></div>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Live SAR Wallet &amp; Transaction Ledger</div>
+            <span id="budgetHeaderBalance" class="badge badge-p2">Balance: 88.33 SAR</span>
+          </div>
+          <div style="padding:12px;display:flex;flex-direction:column;gap:10px;">
+            <form id="manualBudgetForm" style="display:grid;grid-template-columns:1fr 1fr 100px auto;gap:6px;">
+              <input id="manualMerchant" type="text" class="input-field" placeholder="Merchant / Source" required />
+              <input id="manualWallet" type="text" class="input-field" placeholder="Wallet (e.g. STC Pay)" value="Mada *4821" />
+              <input id="manualAmountSar" type="number" step="0.01" class="input-field" placeholder="SAR" required />
+              <button type="submit" class="btn btn-primary">Log</button>
+            </form>
+            <div id="budgetEntriesList" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         ORGAN WORKSPACE 4: DISTRACTION CONFINEMENT & 3-MINUTE IDEA VAULT
+         ==================================================================== -->
+    <section id="organ-ideas" class="organ-workspace-section">
+      <div class="two-col-layout">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Organ 6: 3-Minute Timed Write-Only Idea Capture Gate</div>
+            <span id="vaultGateStatusBadge" class="badge badge-p1">WRITE-ONLY LOCKED</span>
+          </div>
+          <div style="padding:14px;display:flex;flex-direction:column;gap:10px;">
+            <p style="font-size:12px;color:var(--text-secondary);">
+              During active Deep Work, browsing, editing, or organizing past ideas is strictly locked to eliminate shiny-object distraction. Unlock the 3-minute capture gate to rapidly dump a thought; the vault immediately locks back down on save or when the 180-second timer expires.
+            </p>
+            <div id="vaultCountdownDisplay" class="timer-display" style="color:var(--ari-accent);">03:00</div>
+            <div style="display:flex;gap:8px;">
+              <button id="unlockIdeaGateBtn" type="button" class="btn btn-ari" style="flex:1;">Unlock 3-Minute Quick Capture</button>
+              <button id="lockIdeaGateNowBtn" type="button" class="btn btn-ghost">Lock Vault Now</button>
+            </div>
+            <form id="ideaCaptureForm" style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+              <div style="display:grid;grid-template-columns:150px 1fr;gap:8px;">
+                <select id="ideaDomainSelect" class="select-field" aria-label="Idea Domain Tag">
+                  <option value="coding">coding</option>
+                  <option value="hardware">hardware</option>
+                  <option value="personal">personal</option>
+                  <option value="general">general</option>
+                </select>
+                <input id="ideaContentInput" type="text" class="input-field" placeholder="Dump idea fragment before 3:00 timer expires..." disabled />
+              </div>
+              <button id="saveIdeaBtn" type="submit" class="btn btn-primary" disabled>Save Fragment &amp; Immediately Re-Lock Vault</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Friday Builder Markdown Synthesis (`.md`)</div>
+            <button id="runFridaySynthesisBtn" type="button" class="btn btn-jade" style="padding:4px 10px;font-size:11.5px;">
+              Synthesize Vault to Markdown
+            </button>
+          </div>
+          <div style="padding:12px;display:flex;flex-direction:column;gap:8px;">
+            <div id="ideaVaultSummaryText" style="font-size:12px;color:var(--text-secondary);"></div>
+            <pre id="fridaySynthesisOutput" style="background:var(--bg-input);border:1px solid var(--border-subtle);border-radius:8px;padding:10px;font-family:var(--font-mono);font-size:11.5px;min-height:190px;max-height:280px;overflow-y:auto;white-space:pre-wrap;color:#e2e8f0;">Locked during active work window. Click "Synthesize Vault to Markdown" during Friday Builder / Leisure windows to cluster fragments into an actionable blueprint.</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         ORGAN WORKSPACE 5: CIRCADIAN HEALTH, SLEEP & SICKNESS CIRCUIT BREAKER
+         ==================================================================== -->
+    <section id="organ-health" class="organ-workspace-section">
+      <div class="two-col-layout">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Organ 2: Circadian Intake, Fatigue Thresholds &amp; Medicine Counter</div>
+            <span id="healthPolicyBadge" class="badge badge-p3">STANDARD EXECUTION</span>
+          </div>
+          <form id="healthIntakeForm" style="padding:12px;display:flex;flex-direction:column;gap:10px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+              <div>
+                <label for="healthSleepInput" style="font-size:11px;color:var(--text-secondary);">Sleep Hours (Acute &lt;4h)</label>
+                <input id="healthSleepInput" type="number" step="0.5" min="0" max="16" class="input-field" value="6.0" />
+              </div>
+              <div>
+                <label for="healthEnergyInput" style="font-size:11px;color:var(--text-secondary);">Subjective Energy (1-5)</label>
+                <input id="healthEnergyInput" type="number" min="1" max="5" class="input-field" value="4" />
+              </div>
+              <div>
+                <label for="healthWorkoutInput" style="font-size:11px;color:var(--text-secondary);">Workout Type</label>
+                <input id="healthWorkoutInput" type="text" class="input-field" placeholder="Strength / Run" value="Upper Body Hypertrophy" />
+              </div>
+            </div>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+              <input id="healthWorkoutCheck" type="checkbox" checked />
+              <span>Workout Completed Today</span>
+            </label>
+            <button type="submit" class="btn btn-primary">Save Daily Circadian Log</button>
+          </form>
+
+          <div style="padding:0 12px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--border-subtle);padding-top:10px;">
+            <div>
+              <div style="font-weight:700;font-size:12.5px;">Daily Medicine Compliance Counter</div>
+              <div id="medComplianceText" style="font-size:11.5px;color:var(--text-secondary);">Doses taken today: 1 / 2</div>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button id="incrementMedicineBtn" type="button" class="btn btn-jade">+1 Dose Taken</button>
+              <button id="resetMedicineBtn" type="button" class="btn btn-ghost">Reset (0/2)</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Sickness Circuit Breaker (`is_sick` Hardware Unlock)</div>
+            <span id="sickBreakerBadge" class="badge badge-p4">INACTIVE</span>
+          </div>
+          <div style="padding:12px;display:flex;flex-direction:column;gap:10px;">
+            <p style="font-size:12px;color:var(--text-secondary);">
+              When `is_sick = true` is explicitly activated, academic P1 consecutive chains freeze (+24h shift), requirements de-escalate to recovery maintenance, and `/status` returns `{"device_unlocked": true}` to eliminate phone lock friction.
+            </p>
+            <input id="sicknessNotesInput" type="text" class="input-field" placeholder="Sickness / symptom notes (e.g., Fever, migraine recovery)..." />
+            <div style="display:flex;gap:8px;">
+              <button id="activateSickBreakerBtn" type="button" class="btn btn-danger" style="flex:1;">
+                Activate Sickness Circuit Breaker
+              </button>
+              <button id="clearSickBreakerBtn" type="button" class="btn btn-ghost" style="flex:1;">
+                Clear Sickness &amp; Resume P1 Chains
+              </button>
+            </div>
+            <div id="healthDirectiveBox" style="background:var(--bg-input);border:1px solid var(--border-subtle);border-radius:8px;padding:10px;font-family:var(--font-mono);font-size:11.5px;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         ORGAN WORKSPACE 6: STUDY LOCATIONS & COMMUTE FRICTION GATEKEEPER
+         ==================================================================== -->
+    <section id="organ-locations" class="organ-workspace-section">
+      <div class="two-col-layout">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Organ 1: Riyadh Study Locations &amp; Commute Gatekeeper</div>
+          </div>
+          <div style="padding:12px;display:flex;flex-direction:column;gap:10px;">
+            <p style="font-size:12px;color:var(--text-secondary);">
+              Ari intercepts procrastination disguised as "commuting to find a study spot" by verifying whether `commute_minutes_one_way + active_task_duration` breaches the P1 deadline or `00:00 - 00:45` rest window, or exceeds your live SAR budget balance.
+            </p>
+            <div id="locationsListContainer" style="display:flex;flex-direction:column;gap:8px;"></div>
+            <div id="commuteVerdictBox" style="background:var(--bg-input);border:1px solid var(--border-subtle);border-radius:8px;padding:10px;font-family:var(--font-mono);font-size:11.5px;">
+              Select "Check Commute Clearance" on any location above to run Ari's gatekeeper check.
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Register New Study Spot</div>
+          </div>
+          <form id="addLocationForm" style="padding:12px;display:flex;flex-direction:column;gap:8px;">
+            <input id="locNameInput" type="text" class="input-field" placeholder="Location Name (e.g., King Fahad National Library)" required />
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+              <input id="locCommuteInput" type="number" class="input-field" placeholder="One-Way Mins (20)" value="20" required />
+              <input id="locCostInput" type="number" step="0.5" class="input-field" placeholder="Avg Cost SAR (18)" value="18" required />
+              <input id="locQuietInput" type="number" min="1" max="5" class="input-field" placeholder="Quiet (1-5)" value="5" required />
+            </div>
+            <input id="locServiceInput" type="text" class="input-field" placeholder="Service Type (Quiet Library / Specialty Coffee)" value="Quiet Study Hall" />
+            <input id="locNotesInput" type="text" class="input-field" placeholder="Power outlets, Wi-Fi notes..." />
+            <button type="submit" class="btn btn-primary">Add Study Location</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         ORGAN WORKSPACE 7: PERSONAL DIARY & JADE LONGITUDINAL SOUNDING BOARD
+         ==================================================================== -->
+    <section id="organ-diary" class="organ-workspace-section">
+      <div class="two-col-layout">
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Organ 8: Personal Journal &amp; Longitudinal Mindset Ledger</div>
+            <span id="dominantMoodBadge" class="badge badge-p3">Dominant Mood: focused</span>
+          </div>
+          <form id="diaryEntryForm" style="padding:12px;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:grid;grid-template-columns:160px 1fr;gap:8px;">
+              <select id="diaryMoodSelect" class="select-field" aria-label="Mood Indicator">
+                <option value="focused">focused</option>
+                <option value="grounded">grounded</option>
+                <option value="pressured">pressured</option>
+                <option value="fatigued">fatigued</option>
+                <option value="inspired">inspired</option>
+              </select>
+              <input id="diaryTextInput" type="text" class="input-field" placeholder="Write personal reflection (accessible to Jade for longitudinal calibration)..." required />
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button type="submit" class="btn btn-jade" style="flex:1;">Commit Reflection to D1</button>
+              <button id="sendDiaryToJadeBtn" type="button" class="btn btn-ghost">Switch to Jade &amp; Discuss</button>
+            </div>
+          </form>
+          <div id="diaryEntriesList" style="padding:0 12px 12px;display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Jade Longitudinal Mindset Telemetry</div>
+          </div>
+          <div id="diaryInsightsBox" style="padding:12px;font-size:12.5px;display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         ORGAN WORKSPACE 8: HARDWARE BRIDGES (/STATUS, NEWPIPE, CRON) & RETROSPECTIVE
+         ==================================================================== -->
+    <section id="organ-leisure" class="organ-workspace-section">
+      <div class="two-col-layout">
+
+        <!-- Left: MacroDroid /status Polling, NewPipe Video Audit & 03:00 AM Cron -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Organ 10: Zero-Cost Hardware Automations &amp; Bridges</div>
+            <button id="pollStatusBtn" type="button" class="btn btn-ghost" style="padding:4px 8px;font-size:11px;">Poll `GET /status`</button>
+          </div>
+          <div style="padding:12px;display:flex;flex-direction:column;gap:12px;">
+            <div>
+              <div style="font-weight:700;font-size:12px;margin-bottom:4px;">1. MacroDroid Hardware Lock Payload (`GET /status`)</div>
+              <pre id="macrodroidStatusOutput" style="background:var(--bg-input);border:1px solid var(--border-subtle);border-radius:8px;padding:10px;font-family:var(--font-mono);font-size:11px;color:#6ee7b7;overflow-x:auto;"></pre>
+              <div style="display:flex;gap:6px;margin-top:6px;">
+                <button id="simulateOverdueP1Btn" type="button" class="btn btn-danger" style="font-size:11px;">Simulate Overdue P1 Lock</button>
+                <button id="restoreOnTrackP1Btn" type="button" class="btn btn-ghost" style="font-size:11px;">Restore On-Track Deadline</button>
+              </div>
+            </div>
+
+            <div style="border-top:1px solid var(--border-subtle);padding-top:10px;">
+              <div style="font-weight:700;font-size:12px;margin-bottom:4px;">2. NewPipe Task-Aware Video Audit (`POST /api/audit/media`)</div>
+              <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;">
+                <button type="button" class="btn btn-ghost sample-video-btn" data-video="Cellular Respiration &amp; ATP Synthesis Full Lecture - Biology Ch4" style="font-size:11px;">
+                  Test Study Video (Pass)
+                </button>
+                <button type="button" class="btn btn-ghost sample-video-btn" data-video="Top 25 Funny Gaming Moments &amp; Stream Highlights" style="font-size:11px;">
+                  Test Distraction Video (Lock)
+                </button>
+              </div>
+              <div style="display:flex;gap:6px;">
+                <input id="newpipeVideoInput" type="text" class="input-field" placeholder="Scraped NewPipe video title..." value="Cellular Respiration &amp; ATP Synthesis Full Lecture - Biology Ch4" />
+                <button id="auditNewpipeBtn" type="button" class="btn btn-ari">Audit Video</button>
+              </div>
+              <div id="newpipeAuditResult" style="font-family:var(--font-mono);font-size:11.5px;margin-top:6px;"></div>
+            </div>
+
+            <div style="border-top:1px solid var(--border-subtle);padding-top:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+              <div>
+                <div style="font-weight:700;font-size:12px;">3. 03:00 AM Riyadh Daily Cron Engine (`0 0 * * *` UTC)</div>
+                <div style="font-size:11px;color:var(--text-secondary);">Resets medicine counter, reverts untouched bonus tasks, cascades core chains.</div>
+              </div>
+              <button id="runDailyCronBtn" type="button" class="btn btn-primary" style="font-size:11.5px;">Execute 03:00 AST Cron Now</button>
+            </div>
+            <div id="cronExecutionFeedback" style="font-family:var(--font-mono);font-size:11px;color:#93c5fd;"></div>
+          </div>
+        </div>
+
+        <!-- Right: Ari Weekly Retrospective + Friday Hobby Safeguard & Bonus Rewards -->
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title">Organ 8: Ari Saturday Weekly Retrospective (Burnout vs. Avoidance)</div>
+              <span id="retroDiagnosisBadge" class="badge badge-p3">OPTIMAL_CADENCE</span>
+            </div>
+            <div id="retrospectiveBox" style="padding:12px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;"></div>
+          </div>
+
+          <div class="panel-card">
+            <div class="panel-header">
+              <div class="panel-title">Organ 5: Friday Hobby Safeguard &amp; Weekend Bonus Rewards</div>
+              <span id="fridaySafeguardBadge" class="badge badge-bonus">PROTECTED</span>
+            </div>
+            <div id="leisureSummaryBox" style="padding:12px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;"></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ======================================================================
+       UNSKIPPABLE MODAL 1: HTTP 429 INTER-PROVIDER QUOTA FAILOVER PROMPT
+       ====================================================================== -->
+  <div id="providerFailoverModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="failoverModalTitle">
+    <div class="modal-card">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span class="badge badge-p1">HTTP 429 RESOURCE EXHAUSTED</span>
+        <strong id="failoverModalTitle" style="font-size:15px;">Provider Quota Exhausted</strong>
+      </div>
+      <p id="failoverModalPromptText" style="font-size:13.5px;color:var(--text-primary);margin-bottom:14px;">
+        Gemini quota exhausted. Switch active session to Claude?
+      </p>
+      <p style="font-size:11.5px;color:var(--text-secondary);margin-bottom:14px;">
+        Intra-provider Flash-Lite &rarr; Flash fallback tiers returned HTTP 429. Confirming will atomically update `active_provider` in D1 `system_settings` and re-dispatch your pending request.
+      </p>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button id="cancelProviderSwitchBtn" type="button" class="btn btn-ghost">Stay on Current</button>
+        <button id="confirmProviderSwitchBtn" type="button" class="btn btn-ari">Confirm Switch &amp; Re-Dispatch</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 2: SINGLE-OPERATOR WORKER ENDPOINT & API KEY CONFIGURATION
+       ====================================================================== -->
+  <div id="operatorConfigModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="configModalTitle">
+    <div class="modal-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <strong id="configModalTitle" style="font-size:15px;">Single-Operator Worker &amp; Encrypted Key Settings</strong>
+        <button id="closeConfigModalBtn" type="button" class="btn btn-ghost" style="padding:4px 8px;">Close</button>
+      </div>
+      <form id="operatorConfigForm" style="display:flex;flex-direction:column;gap:10px;">
+        <div>
+          <label for="cfgWorkerUrl" style="font-size:11.5px;color:var(--text-secondary);">Cloudflare Worker Endpoint URL (Leave blank for embedded D1 mirror)</label>
+          <input id="cfgWorkerUrl" type="text" class="input-field" placeholder="https://mazenos.<your-subdomain>.workers.dev" />
+        </div>
+        <div>
+          <label for="cfgMasterToken" style="font-size:11.5px;color:var(--text-secondary);">Master Operator Bearer Token (`Authorization: Bearer <token>`)</label>
+          <input id="cfgMasterToken" type="password" class="input-field" placeholder="mazenos_master_secret_token" />
+        </div>
+        <div>
+          <label for="cfgRestWindow" style="font-size:11.5px;color:var(--text-secondary);">Riyadh Circadian Rest Window (AST)</label>
+          <input id="cfgRestWindow" type="text" class="input-field" value="00:00 - 00:45" />
+        </div>
+        <button type="submit" class="btn btn-primary">Save Operator Configuration</button>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="dashboard.js"></script>
+</body>
+</html>

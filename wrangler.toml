@@ -1,0 +1,22 @@
+name = "mazenos"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[triggers]
+# 00:00 UTC = 03:00 Asia/Riyadh (AST) Daily Maintenance & Cascade Cron
+crons = ["0 0 * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mazenos_db"
+database_id = "00000000-0000-0000-0000-000000000001"
+migrations_dir = "migrations"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "00000000000000000000000000000001"
+
+[vars]
+TIMEZONE = "Asia/Riyadh"
+DEFAULT_REST_WINDOW = "00:00 - 00:45"
